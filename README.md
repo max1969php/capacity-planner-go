@@ -61,13 +61,36 @@ internal/httpapi  net/http handlers, request validation, error mapping, middlewa
 
 ## Running it
 
-You'll need Go 1.27+, Node 22 with pnpm, and Docker with the Compose plugin.
+You'll need Go 1.27+, Node 22 with pnpm, and Docker with the Compose plugin. Check them with:
 
 ```sh
+go version
+node --version
+pnpm --version
+docker compose version
+```
+
+From a fresh clone:
+
+```sh
+git clone https://github.com/max1969php/capacity-planner-go.git
+cd capacity-planner-go
 pnpm install
 pnpm db:up                    # Spins up Postgres 17 on localhost:5433
 pnpm dev                      # API on :8080 and web on :5173, together
-pnpm db:seed                  # Seeds fake data (run in another terminal)
+```
+
+The API applies the migrations when it starts, so seed only once it's running. In another terminal:
+
+```sh
+pnpm db:seed                  # Seeds fake data
+```
+
+Then open http://localhost:5173. No `.env` is needed: the API defaults to the Compose database. `pnpm db:down` removes the container and its data, so run `pnpm dev` and `pnpm db:seed` again after the next `pnpm db:up`.
+
+Other commands:
+
+```sh
 pnpm nx serve api             # Only the API
 pnpm nx serve web             # Only the web app (proxies /api to :8080)
 pnpm test                     # Go unit tests (no DB required)

@@ -1,17 +1,19 @@
-import Box from '@cloudscape-design/components/box'
 import Button from '@cloudscape-design/components/button'
 import Form from '@cloudscape-design/components/form'
 import FormField from '@cloudscape-design/components/form-field'
-import Header from '@cloudscape-design/components/header'
 import Input from '@cloudscape-design/components/input'
 import Modal from '@cloudscape-design/components/modal'
 import SpaceBetween from '@cloudscape-design/components/space-between'
-import StatusIndicator from '@cloudscape-design/components/status-indicator'
-import Table from '@cloudscape-design/components/table'
 import { useState } from 'react'
 import { ApiError, type Project } from '../api.ts'
+import { type DataColumn, DataTable } from '../components/DataTable.tsx'
 import { useNotify } from '../notify.ts'
 import { useCreateProject, useProjects } from '../queries.ts'
+
+const columns: DataColumn<Project>[] = [
+  { key: 'id', header: 'ID', type: 'number' },
+  { key: 'name', header: 'Name', type: 'text' },
+]
 
 export function ProjectsPage() {
   const { data = [], isLoading, error } = useProjects()
@@ -19,28 +21,18 @@ export function ProjectsPage() {
 
   return (
     <>
-      <Table<Project>
-        variant="full-page"
+      <DataTable
+        id="projects"
+        title="Projects"
+        headerVariant="h1"
+        columns={columns}
         items={data}
         loading={isLoading}
         loadingText="Loading projects"
+        error={error}
+        emptyText="No projects yet"
         trackBy="id"
-        header={
-          <Header
-            variant="h1"
-            counter={`(${data.length})`}
-            actions={<Button variant="primary" onClick={() => setCreating(true)}>Add project</Button>}
-          >
-            Projects
-          </Header>
-        }
-        empty={
-          error ? <StatusIndicator type="error">{error.message}</StatusIndicator> : <Box textAlign="center">No projects yet</Box>
-        }
-        columnDefinitions={[
-          { id: 'id', header: 'ID', cell: (p) => p.id },
-          { id: 'name', header: 'Name', cell: (p) => p.name },
-        ]}
+        actions={<Button variant="primary" onClick={() => setCreating(true)}>Add project</Button>}
       />
       {creating && <CreateProjectModal onClose={() => setCreating(false)} />}
     </>

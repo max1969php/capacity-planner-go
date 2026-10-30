@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Capacity planner API on Lambda, behind an HTTP API.
+
+Parameters:
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+    Description: Postgres connection string. Add pool_max_conns=2, each Lambda instance serves one request at a time.
+
+Resources:
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      # The API has no authentication: the throttle caps what a stranger can do.
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: bin/lambda
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures: [arm64]
+      MemorySize: 256
+      Timeout: 15
+      # The Web Adapter runs the unchanged HTTP server and forwards each event to it.
+      Layers:
+        - !Sub arn:aws:lambda:${AWS::Region}:753240598075:layer:LambdaAdapterLayerArm64:30
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: /opt/bootstrap
+          AWS_LWA_READINESS_CHECK_PATH: /healthz
+          DATABASE_URL: !Ref DatabaseUrl
+      Events:
+        Http:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+
+  FunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${Function}
+      RetentionInDays: 14
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com

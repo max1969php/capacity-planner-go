@@ -1,17 +1,14 @@
-import { useCollection } from '@cloudscape-design/collection-hooks'
 import Box from '@cloudscape-design/components/box'
 import ColumnLayout from '@cloudscape-design/components/column-layout'
 import Container from '@cloudscape-design/components/container'
 import DatePicker from '@cloudscape-design/components/date-picker'
 import FormField from '@cloudscape-design/components/form-field'
 import Header from '@cloudscape-design/components/header'
-import Pagination from '@cloudscape-design/components/pagination'
 import SpaceBetween from '@cloudscape-design/components/space-between'
 import StatusIndicator, { type StatusIndicatorProps } from '@cloudscape-design/components/status-indicator'
-import Table from '@cloudscape-design/components/table'
-import TextFilter from '@cloudscape-design/components/text-filter'
 import { useState } from 'react'
 import type { Status, WeekLoad } from '../api.ts'
+import { type DataColumn, DataTable } from '../components/DataTable.tsx'
 import { addDays, toISODate, weekStart } from '../dates.ts'
 import { useCapacity } from '../queries.ts'
 
@@ -23,6 +20,30 @@ const statusView: Record<Status, { type: StatusIndicatorProps.Type; label: strin
 
 const hours = (h: number) => `${h} h`
 
+const columns: DataColumn<WeekLoad>[] = [
+  { key: 'weekStart', header: 'Week of', type: 'date' },
+  { key: 'personName', header: 'Person', type: 'text' },
+  { key: 'capacity', header: 'Capacity', type: 'number', cell: (r) => hours(r.capacity), exportHeader: 'Capacity (h)' },
+  { key: 'planned', header: 'Planned', type: 'number', cell: (r) => hours(r.planned), exportHeader: 'Planned (h)' },
+  { key: 'tracked', header: 'Tracked', type: 'number', cell: (r) => hours(r.tracked), exportHeader: 'Tracked (h)' },
+  {
+    key: 'utilisation',
+    header: 'Utilisation',
+    type: 'number',
+    cell: (r) => `${Math.round(r.utilisation * 100)}%`,
+    exportHeader: 'Utilisation (%)',
+    exportValue: (r) => Math.round(r.utilisation * 100),
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    type: 'enum',
+    cell: (r) => <StatusIndicator type={statusView[r.status].type}>{statusView[r.status].label}</StatusIndicator>,
+    format: (s) => statusView[s as Status]?.label ?? s,
+    exportValue: (r) => statusView[r.status].label,
+  },
+]
+
 export function CapacityPage() {
   // Default range: the current week and the next three.
   const [from, setFrom] = useState(() => toISODate(weekStart(new Date())))
@@ -30,16 +51,6 @@ export function CapacityPage() {
 
   const { data, isLoading, error } = useCapacity(from, to)
   const rows = data?.rows ?? []
-
-  const { items, collectionProps, filterProps, paginationProps, filteredItemsCount } = useCollection(rows, {
-    filtering: {
-      filteringFunction: (row, text) => row.personName.toLowerCase().includes(text.toLowerCase()),
-      empty: <Box textAlign="center">No people yet. Add them from the People page.</Box>,
-      noMatch: <Box textAlign="center">No person matches the filter.</Box>,
-    },
-    sorting: { defaultState: { sortingColumn: { sortingField: 'weekStart' } } },
-    pagination: { pageSize: 25 },
-  })
 
   const count = (s: Status) => rows.filter((r) => r.status === s).length
 
@@ -71,52 +82,17 @@ export function CapacityPage() {
         </ColumnLayout>
       </Container>
 
-      <Table<WeekLoad>
-        {...collectionProps}
-        variant="full-page"
-        items={items}
+      <DataTable
+        id="capacity"
+        title={data ? `Weeks ${data.from} – ${data.to}` : 'Report'}
+        columns={columns}
+        items={rows}
         loading={isLoading}
         loadingText="Loading report"
+        error={error}
+        emptyText="No people yet. Add them from the People page."
         trackBy={(r) => `${r.personId}-${r.weekStart}`}
-        header={
-          <Header counter={data ? `(${rows.length})` : undefined}>
-            {data ? `Weeks ${data.from} – ${data.to}` : 'Report'}
-          </Header>
-        }
-        empty={
-          error ? (
-            <StatusIndicator type="error">{error.message}</StatusIndicator>
-          ) : (
-            <Box textAlign="center">No data</Box>
-          )
-        }
-        filter={
-          <TextFilter
-            {...filterProps}
-            filteringPlaceholder="Filter by person"
-            countText={`${filteredItemsCount} matches`}
-          />
-        }
-        pagination={<Pagination {...paginationProps} />}
-        columnDefinitions={[
-          { id: 'week', header: 'Week of', cell: (r) => r.weekStart, sortingField: 'weekStart' },
-          { id: 'person', header: 'Person', cell: (r) => r.personName, sortingField: 'personName' },
-          { id: 'capacity', header: 'Capacity', cell: (r) => hours(r.capacity), sortingField: 'capacity' },
-          { id: 'planned', header: 'Planned', cell: (r) => hours(r.planned), sortingField: 'planned' },
-          { id: 'tracked', header: 'Tracked', cell: (r) => hours(r.tracked), sortingField: 'tracked' },
-          {
-            id: 'utilisation',
-            header: 'Utilisation',
-            cell: (r) => `${Math.round(r.utilisation * 100)}%`,
-            sortingField: 'utilisation',
-          },
-          {
-            id: 'status',
-            header: 'Status',
-            cell: (r) => <StatusIndicator type={statusView[r.status].type}>{statusView[r.status].label}</StatusIndicator>,
-            sortingField: 'status',
-          },
-        ]}
+        defaultSort="weekStart"
       />
     </SpaceBetween>
   )

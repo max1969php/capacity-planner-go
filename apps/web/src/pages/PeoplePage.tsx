@@ -1,17 +1,26 @@
-import Box from '@cloudscape-design/components/box'
 import Button from '@cloudscape-design/components/button'
 import Form from '@cloudscape-design/components/form'
 import FormField from '@cloudscape-design/components/form-field'
-import Header from '@cloudscape-design/components/header'
 import Input from '@cloudscape-design/components/input'
 import Modal from '@cloudscape-design/components/modal'
 import SpaceBetween from '@cloudscape-design/components/space-between'
-import StatusIndicator from '@cloudscape-design/components/status-indicator'
-import Table from '@cloudscape-design/components/table'
 import { useState } from 'react'
 import type { Person } from '../api.ts'
+import { type DataColumn, DataTable } from '../components/DataTable.tsx'
 import { useNotify } from '../notify.ts'
 import { useCreatePerson, usePeople } from '../queries.ts'
+
+const columns: DataColumn<Person>[] = [
+  { key: 'id', header: 'ID', type: 'number' },
+  { key: 'name', header: 'Name', type: 'text' },
+  {
+    key: 'weeklyCapacity',
+    header: 'Weekly capacity',
+    type: 'number',
+    cell: (p) => `${p.weeklyCapacity} h`,
+    exportHeader: 'Weekly capacity (h)',
+  },
+]
 
 export function PeoplePage() {
   const { data = [], isLoading, error } = usePeople()
@@ -19,29 +28,18 @@ export function PeoplePage() {
 
   return (
     <>
-      <Table<Person>
-        variant="full-page"
+      <DataTable
+        id="people"
+        title="People"
+        headerVariant="h1"
+        columns={columns}
         items={data}
         loading={isLoading}
         loadingText="Loading people"
+        error={error}
+        emptyText="No people yet"
         trackBy="id"
-        header={
-          <Header
-            variant="h1"
-            counter={`(${data.length})`}
-            actions={<Button variant="primary" onClick={() => setCreating(true)}>Add person</Button>}
-          >
-            People
-          </Header>
-        }
-        empty={
-          error ? <StatusIndicator type="error">{error.message}</StatusIndicator> : <Box textAlign="center">No people yet</Box>
-        }
-        columnDefinitions={[
-          { id: 'id', header: 'ID', cell: (p) => p.id },
-          { id: 'name', header: 'Name', cell: (p) => p.name },
-          { id: 'capacity', header: 'Weekly capacity', cell: (p) => `${p.weeklyCapacity} h` },
-        ]}
+        actions={<Button variant="primary" onClick={() => setCreating(true)}>Add person</Button>}
       />
       {creating && <CreatePersonModal onClose={() => setCreating(false)} />}
     </>

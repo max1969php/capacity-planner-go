@@ -22,6 +22,18 @@
         "{projectRoot}/bin"
       ]
     },
+    "build-lambda": {
+      "command": "GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/lambda/bootstrap ./cmd/api",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "inputs": [
+        "go"
+      ],
+      "outputs": [
+        "{projectRoot}/bin/lambda"
+      ]
+    },
     "test": {
       "command": "go test ./...",
       "options": {
