@@ -23,6 +23,7 @@ type Store interface {
 	CreateAllocation(ctx context.Context, a planner.Allocation) (planner.Allocation, error)
 	CreateTimeEntry(ctx context.Context, e planner.TimeEntry) (planner.TimeEntry, error)
 	ListPeople(ctx context.Context) ([]planner.Person, error)
+	ListProjects(ctx context.Context) ([]planner.Project, error)
 	AllocationsOverlapping(ctx context.Context, from, to time.Time) ([]planner.Allocation, error)
 	TrackedHoursByWeek(ctx context.Context, from, to time.Time) (map[planner.TrackedKey]float64, error)
 }
@@ -45,6 +46,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /people", s.listPeople)
 	mux.HandleFunc("POST /people", s.createPerson)
+	mux.HandleFunc("GET /projects", s.listProjects)
 	mux.HandleFunc("POST /projects", s.createProject)
 	mux.HandleFunc("POST /allocations", s.createAllocation)
 	mux.HandleFunc("POST /time-entries", s.createTimeEntry)
@@ -86,6 +88,15 @@ func (s *Server) listPeople(w http.ResponseWriter, r *http.Request) {
 
 type createProjectRequest struct {
 	Name string `json:"name"`
+}
+
+func (s *Server) listProjects(w http.ResponseWriter, r *http.Request) {
+	projects, err := s.store.ListProjects(r.Context())
+	if err != nil {
+		s.storeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, projects)
 }
 
 func (s *Server) createProject(w http.ResponseWriter, r *http.Request) {

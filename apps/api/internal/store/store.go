@@ -93,6 +93,18 @@ func (s *Store) ListPeople(ctx context.Context) ([]planner.Person, error) {
 	})
 }
 
+func (s *Store) ListProjects(ctx context.Context) ([]planner.Project, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id, name FROM projects ORDER BY name, id`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (planner.Project, error) {
+		var p planner.Project
+		err := r.Scan(&p.ID, &p.Name)
+		return p, err
+	})
+}
+
 // AllocationsOverlapping returns the allocations that cover at least one
 // day of [from, to].
 func (s *Store) AllocationsOverlapping(ctx context.Context, from, to time.Time) ([]planner.Allocation, error) {

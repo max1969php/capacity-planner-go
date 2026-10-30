@@ -1,4 +1,13 @@
-/bin/
+# Go
+/apps/api/bin/
 *.test
 *.out
+
+# Node
+node_modules/
+dist/
+
+# Nx
+.nx/
+
 .env

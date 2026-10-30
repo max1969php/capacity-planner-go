@@ -52,6 +52,10 @@ func (f *fakeStore) CreateTimeEntry(_ context.Context, e planner.TimeEntry) (pla
 
 func (f *fakeStore) ListPeople(context.Context) ([]planner.Person, error) { return f.people, nil }
 
+func (f *fakeStore) ListProjects(context.Context) ([]planner.Project, error) {
+	return []planner.Project{}, nil
+}
+
 func (f *fakeStore) AllocationsOverlapping(context.Context, time.Time, time.Time) ([]planner.Allocation, error) {
 	return f.allocations, nil
 }

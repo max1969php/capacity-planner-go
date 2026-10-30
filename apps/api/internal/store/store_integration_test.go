@@ -56,6 +56,9 @@ func TestStoreRoundTrip(t *testing.T) {
 	if _, err := s.CreateProject(ctx, "Website"); !errors.Is(err, ErrInvalid) {
 		t.Errorf("duplicate project error = %v, want ErrInvalid", err)
 	}
+	if projects, err := s.ListProjects(ctx); err != nil || len(projects) != 1 {
+		t.Errorf("projects = %v, %v, want one", projects, err)
+	}
 
 	alloc := planner.Allocation{PersonID: ada.ID, ProjectID: proj.ID, Start: d("2026-11-02"), End: d("2026-11-20"), HoursPerWeek: 30}
 	if _, err := s.CreateAllocation(ctx, alloc); err != nil {

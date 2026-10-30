@@ -1,29 +1,23 @@
 # capacity-planner-go
 
-A small capacity-planning API in Go and Postgres. It answers one question:
-**for each person and week, how much work is planned against their capacity,
-and how much time was actually tracked?**
+A lightweight capacity planning API built to learn Go properly, with a React + Cloudscape frontend, in an Nx monorepo.
 
-I write TypeScript (React, NestJS) in production every day. I built this
-project to learn Go properly. It does not port a Node app line by line: it
-follows the idioms of the standard library, writes SQL by hand, and tests
-the parts that can break.
+per person, per week, how much work is planned versus how much time was actually tracked?
 
-## What it does
+## endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
-| `POST /people` | `{ "name", "weeklyCapacity" }`: a person and their hours per week |
-| `GET /people` | list people |
+| `POST /people` | `{ "name", "weeklyCapacity" }` |
+| `GET /people` | List people |
+| `GET /projects` | List projects |
 | `POST /projects` | `{ "name" }` |
-| `POST /allocations` | `{ "personId", "projectId", "start", "end", "hoursPerWeek" }`: planned work, dates inclusive |
-| `POST /time-entries` | `{ "personId", "projectId", "date", "minutes" }`: tracked work |
-| `GET /capacity?from=YYYY-MM-DD&to=YYYY-MM-DD` | one row per person per ISO week: capacity, planned, tracked, utilisation, status (`under` below 80%, `ok`, `over` above 100%) |
-| `GET /healthz` | liveness |
+| `POST /allocations` | `{ "personId", "projectId", "start", "end", "hoursPerWeek" }` (dates inclusive) |
+| `POST /time-entries` | `{ "personId", "projectId", "date", "minutes" }` |
+| `GET /capacity?from=YYYY-MM-DD&to=YYYY-MM-DD` | Weekly breakdown per person: capacity, planned, tracked, utilization, status (`under` < 80%, `ok`, `over` > 100%) |
+| `GET /healthz` | Liveness check |
 
-Allocations that start or end mid-week are **pro-rated on working days**: a
-20 h/week allocation that starts on a Wednesday plans 12 h in that week.
-The report range is widened to whole weeks and limited to 26 weeks.
+Mid-week allocations get pro-rated on working days (e.g., a 20h/week allocation starting on a Wednesday counts as 12h for that week). The report range automatically expands to whole weeks and caps out at 26 weeks.
 
 ```console
 $ curl -s 'localhost:8080/capacity?from=2026-11-16&to=2026-11-22' | jq '.rows[0]'
@@ -37,87 +31,60 @@ $ curl -s 'localhost:8080/capacity?from=2026-11-16&to=2026-11-22' | jq '.rows[0]
   "utilisation": 1.2,
   "status": "over"
 }
+
 ```
 
 ## Design
 
 ```
-cmd/api            main: config, pgx pool, migrations, http.Server, graceful shutdown
-internal/planner   domain types and pure logic (weeks, pro-rating, utilisation): no I/O
-internal/store     Postgres via pgx, plain SQL, embedded migrations
-internal/httpapi   net/http handlers, validation, error mapping, middleware
+apps/api          Go module (go.mod), Nx targets in project.json
+apps/web          Vite + React + TypeScript, AWS Cloudscape, TanStack Query
+docker-compose.yml  Postgres 17 for local development
 ```
 
-- **Pure core, thin edges.** All the capacity logic is in `planner` and is
-  covered by table-driven tests that need no database.
-- **SQL where it belongs.** Tracked time is aggregated in Postgres
-  (`GROUP BY person_id, date_trunc('week', entry_date)`), so the API reads
-  one row per person and week, not every entry. Pro-rating stays in Go,
-  where it is easy to read and test.
-- **Indexes match the queries.** `allocations (person_id, start_date, end_date)`
-  for the overlap filter, and `time_entries (entry_date, person_id) INCLUDE (minutes)`
-  so the weekly sum can be an index-only scan.
-- **Constraints in the database, errors in the API.** `CHECK`, `UNIQUE` and
-  foreign keys reject bad data. The store maps SQLSTATE codes to
-  `ErrNotFound` and `ErrInvalid`, and the HTTP layer maps those to
-  422 and 409, so handlers never see driver details.
-- **Standard library first.** Routing uses Go 1.22+ patterns
-  (`mux.HandleFunc("GET /capacity", …)`), logging uses `log/slog`, and
-  shutdown uses `signal.NotifyContext`. The only dependency is `pgx`.
-- **Interfaces at the consumer.** `httpapi.Store` is declared where it is
-  used. `*store.Store` satisfies it implicitly, and tests use an in-memory
-  fake.
+Inside `apps/api`:
+
+```
+cmd/api           main entrypoint: config, pgx pool, migrations, http.Server, graceful shutdown
+internal/planner  domain logic and calculations (weeks, pro-rating, utilization): zero I/O
+internal/store    Postgres interaction via pgx, raw SQL, embedded migrations
+internal/httpapi  net/http handlers, request validation, error mapping, middleware
+
+```
+
+1) All business logic lives in `planner` and is covered by fast, database-free table tests.
+2) Tracked time rolls up via Postgres (`GROUP BY person_id, date_trunc('week', entry_date)`). Go handles the pro-rating math where it's easy to unit test.
+3) `allocations (person_id, start_date, end_date)` for range overlaps, and `time_entries (entry_date, person_id) INCLUDE (minutes)` for index-only weekly sums.
+4) DB enforces validity via `CHECK` and foreign keys. The store layer translates SQL states into `ErrNotFound` / `ErrInvalid`, which the HTTP layer turns into proper status codes so handlers stay clean.
+5) Routing uses Go's built-in `net/http` pattern matching (Go 1.22+), logging uses `slog`, and shutdown uses `signal.NotifyContext`. The only external dependency is `pgx`.
+6) `httpapi.Store` is declared right where it's used. `*store.Store` implements it implicitly, and tests use a simple in-memory mock.
 
 ## Running it
 
-Requires Go 1.27+ and Docker.
+You'll need Go 1.27+, Node 22 with pnpm, and Docker with the Compose plugin.
 
 ```sh
-make db-up                # Postgres 17 on localhost:5433
-make run                  # applies migrations, listens on :8080
-make seed                 # demo data with fictional names (in another terminal)
-make test                 # unit tests, no database
-make test-integration     # store tests against the Docker database (truncates it)
+pnpm install
+pnpm db:up                    # Spins up Postgres 17 on localhost:5433
+pnpm dev                      # API on :8080 and web on :5173, together
+pnpm db:seed                  # Seeds fake data (run in another terminal)
+pnpm nx serve api             # Only the API
+pnpm nx serve web             # Only the web app (proxies /api to :8080)
+pnpm test                     # Go unit tests (no DB required)
+pnpm lint                     # go vet + gofmt, oxlint
+pnpm build                    # Go binary in apps/api/bin, web bundle in apps/web/dist
+pnpm nx test-integration api  # Store integration tests against Docker (truncates the tables)
 ```
 
-CI (`.github/workflows/ci.yml`) runs `gofmt`, `go vet`, the unit tests and
-the integration tests with the race detector against a Postgres service.
+CI runs two jobs: `gofmt`, `go vet` and the Go test suites against a live Postgres service, then lint and build for the web app.
 
-## TypeScript → Go: notes
+## Moving from TS to Go: Observations
 
-Things that changed how I write code, collected while building this:
+A few things that clicked (or tripped me up) while building this:
 
-- **Errors are values.** No `try/catch`: every call that can fail returns an
-  `error`, and wrapping (`fmt.Errorf("…: %w", err)`) plus `errors.Is` /
-  `errors.As` replace exception classes.
-- **Interfaces are satisfied implicitly.** Declare small interfaces where
-  they are consumed, not next to the implementation.
-- **Zero values are part of the design.** A `nil` map can be read but not
-  written, and a `nil` slice encodes as JSON `null`, not `[]`.
-- **`context.Context` is passed explicitly** for cancellation and deadlines,
-  down to every query, instead of living in async-local storage.
-- **Concurrency is explicit.** Goroutines and channels in `main` for the
-  server and shutdown, instead of an event loop.
-- **Tooling is built in.** `gofmt`, `go vet`, `go test -race` and
-  `go test -cover` with no configuration files.
-
-## Learning log
-
-| Date | What I studied or built |
-| --- | --- |
-| 2026-10-28 | Project setup: planner core with tests, pgx store, net/http API, CI |
-| | |
-
-## Next steps
-
-Planned exercises, each one a new concept:
-
-- [ ] Run the two report queries concurrently with `errgroup` and measure
-      the difference.
-- [ ] Generate the store from SQL with `sqlc` and compare it with the
-      hand-written version.
-- [ ] Load test `/capacity` with 1,000 people and 100k time entries, and
-      read the `EXPLAIN ANALYZE` output.
-- [ ] Add an exclusion constraint on `daterange(start_date, end_date, '[]')`
-      to prevent duplicate allocations of a person on the same project.
-- [ ] OpenAPI description and a small React client that uses TanStack Query.
+- No `try/catch`. Every fallible function returns an `error`. Wrapping with `fmt.Errorf("...: %w", err)` and checking with `errors.Is` replaces exception hierarchies.
+- You don't declare that a struct implements an interface; it just does. And you define them at the consumer, not next to the struct implementation.
+- A `nil` map can be read from but will panic on write. A `nil` slice encodes to JSON `null` rather than `[]`.
+- `context.Context` goes down to every query for cancellation and deadlines instead of hiding in async-local storage.
+-  Goroutines and channels in `main` handle server lifecycles cleanly without event-loop abstractions.
+- `gofmt`, `go vet`, `-race`, and `-cover` work out of the box with zero configuration files.

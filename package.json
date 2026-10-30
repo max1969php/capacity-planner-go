@@ -1,0 +1,17 @@
+{
+  "name": "capacity-planner",
+  "private": true,
+  "packageManager": "pnpm@10.18.2",
+  "scripts": {
+    "dev": "nx run-many -t serve",
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down",
+    "db:seed": "docker compose exec -T db psql -U planner -d planner < apps/api/scripts/seed.sql"
+  },
+  "devDependencies": {
+    "nx": "24.0.2"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "api",
+  "projectType": "application",
+  "targets": {
+    "serve": {
+      "command": "DATABASE_URL=${DATABASE_URL:-postgres://planner:planner@localhost:5433/planner?sslmode=disable} go run ./cmd/api",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "continuous": true
+    },
+    "build": {
+      "command": "go build -o bin/api ./cmd/api",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "inputs": [
+        "go"
+      ],
+      "outputs": [
+        "{projectRoot}/bin"
+      ]
+    },
+    "test": {
+      "command": "go test ./...",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "inputs": [
+        "go"
+      ]
+    },
+    "test-integration": {
+      "command": "DATABASE_URL=${DATABASE_URL:-postgres://planner:planner@localhost:5433/planner?sslmode=disable} go test -tags integration ./...",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "cache": false
+    },
+    "lint": {
+      "command": "go vet ./... && test -z \"$(gofmt -l .)\"",
+      "options": {
+        "cwd": "{projectRoot}"
+      },
+      "inputs": [
+        "go"
+      ]
+    }
+  }
+}
