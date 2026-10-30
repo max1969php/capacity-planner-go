@@ -11,3 +11,6 @@ dist/
 .nx/
 
 .env
+
+# Local study copies
+/COMMENTATI/
