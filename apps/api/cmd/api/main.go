@@ -30,6 +30,7 @@ func run(log *slog.Logger) error {
 	defer stop()
 
 	dsn := os.Getenv("DATABASE_URL")
+
 	if dsn == "" {
 		return errors.New("DATABASE_URL is not set")
 	}

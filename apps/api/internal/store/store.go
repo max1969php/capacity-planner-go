@@ -70,6 +70,27 @@ func (s *Store) CreateAllocation(ctx context.Context, a planner.Allocation) (pla
 	).Scan(&a.ID)
 	return a, mapError(err)
 }
+var ErrOverCapacity = errors.New("over capacity")
+
+// CreateAllocationChecked inserts the allocation only if the person still
+// has capacity in that period. Naive version: three separate statements.
+func (s *Store) CreateAllocationChecked(ctx context.Context, a planner.Allocation) (planner.Allocation, error) {
+        var capacity float64
+		err := s.pool.QueryRow(ctx,
+			`SELECT weekly_capacity FROM people WHERE id=1`,
+			capacity,
+			).Scan(&a.ID)
+			println(capacity,err)
+        // TODO 1: QueryRow su people per leggere weekly_capacity in &capacity.
+        //         Se err è pgx.ErrNoRows → return a, ErrNotFound
+
+       // var allocated float64
+        // TODO 2: QueryRow con la SUM sulle allocazioni sovrapposte → &allocated
+
+        // TODO 3: se allocated + a.HoursPerWeek > capacity → return a, ErrOverCapacity
+
+        return s.CreateAllocation(ctx, a)
+}
 
 func (s *Store) CreateTimeEntry(ctx context.Context, e planner.TimeEntry) (planner.TimeEntry, error) {
 	err := s.pool.QueryRow(ctx,

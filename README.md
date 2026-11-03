@@ -111,3 +111,39 @@ A few things that clicked (or tripped me up) while building this:
 - `context.Context` goes down to every query for cancellation and deadlines instead of hiding in async-local storage.
 -  Goroutines and channels in `main` handle server lifecycles cleanly without event-loop abstractions.
 - `gofmt`, `go vet`, `-race`, and `-cover` work out of the box with zero configuration files.
+
+## NEI TEST DA LOCALE VERSO IL DB  ONLINE POSTGRES:
+
+sudo apt install postgresql-client   # solo il client psql
+
+dotenv
+DATABASE_URL="postgresql://utente:password@ep-xxx.REGIONE.aws.neon.tech/neondb?sslmode=require"
+
+2. Caricalo in ogni nuovo terminale
+cd ~/projects/capacity-planner-go
+set -a; source .env; set +a
+
+3. Controlla, senza stampare la password
+[ -n "$DATABASE_URL" ] && echo OK || echo VUOTA
+
+4. Lancia i test
+- export PATH=$HOME/.local/go/bin:$PATH
+cd apps/api
+go test -tags integration ./internal/store
+
+- per rilanciare
+go test -count=1 -v -tags integration ./internal/store
+- -v mostra anche il nome di ogni test che gira.
+
+ - La variabile vale solo nel terminale in cui hai eseguito source: se ne apri un altro, devi ricaricarla. Se il test risulta "skipped" è perché la variabile è vuota in quel terminale.
+
+- Alla fine
+cd ~/projects/capacity-planner-go
+psql "$DATABASE_URL" -f apps/api/scripts/seed.sql
+
+Cosa tenere presente
+- Non usare pnpm db:seed: quel comando passa da Docker e scrive sul database locale, non su Neon.
+- Tabelle aggiunte: il seed svuota solo people, projects, allocations e time_entries. Quello che crei in più, come la tabella da un milione di righe dell'esercizio 5, va rimosso a mano con DROP TABLE.
+- Spazio occupato: se metti il milione di righe in time_entries, dopo il TRUNCATE lo spazio viene liberato. Una tabella a parte resta invece finché non la elimini.
+- App pubblicata: se è online su Vercel e Lambda, durante gli esercizi può mostrare dati vuoti, errori o lentezza.
+- Migrazioni: il seed non ricrea lo schema. Se durante gli esercizi modifichi le tabelle, annulla la modifica a mano, altrimenti la produzione resta diversa dalle migrazioni.

@@ -42,6 +42,30 @@ func d(s string) time.Time {
 	return t
 }
 
+func OverCapacity(t *testing.T) {
+	s, ctx := setup(t)
+
+	ada, err := s.CreatePerson(ctx, "Ada", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proj, err := s.CreateProject(ctx, "Website")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateProject(ctx, "Website"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("duplicate project error = %v, want ErrInvalid", err)
+	}
+	if projects, err := s.ListProjects(ctx); err != nil || len(projects) != 1 {
+		t.Errorf("projects = %v, %v, want one", projects, err)
+	}
+
+	alloc := planner.Allocation{PersonID: ada.ID, ProjectID: proj.ID, Start: d("2026-11-02"), End: d("2026-11-20"), HoursPerWeek: 30}
+	if _, err := s.CreateAllocationChecked(ctx, alloc); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestStoreRoundTrip(t *testing.T) {
 	s, ctx := setup(t)
 
